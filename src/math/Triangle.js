@@ -13,8 +13,23 @@ const _vap = /*@__PURE__*/ new Vector3();
 const _vbp = /*@__PURE__*/ new Vector3();
 const _vcp = /*@__PURE__*/ new Vector3();
 
+/**
+ * class简介：
+ * Triangle描述在三维空间中一个平面三角形
+ * 三角形通过三维空间上3个三维坐标点来表示。
+ * 注意：根据三个点顺序的不同会被认为是不同的三角形
+ * 根据a、b、c传入的顺序不同，三角面的normal也不同
+ * */  
+
+/** 三角形 */
 class Triangle {
 
+    /**
+     * 构造函数
+     * @param {*} a 平面三角形的顶点1 
+     * @param {*} b 平面三角形的顶点2
+     * @param {*} c 平面三角形的顶点3
+     */
 	constructor( a = new Vector3(), b = new Vector3(), c = new Vector3() ) {
 
 		this.a = a;
@@ -23,6 +38,16 @@ class Triangle {
 
 	}
 
+    /**
+     * 给出一个面上的非共线三点，求出这个面的normal
+     * @param {*} a 平面三角形的顶点1
+     * @param {*} b 平面三角形的顶点2
+     * @param {*} c 平面三角形的顶点3
+     * @param {*} target 结果将会被拷贝到这个Vector3中
+     * @returns 
+     * 注意：请不要传入共线的三个点
+     * normal的方向是正还是负数会根据abc传入顺序不同而不同
+     */
 	static getNormal( a, b, c, target ) {
 
 		if ( target === undefined ) {
@@ -32,13 +57,14 @@ class Triangle {
 
 		}
 
+        // 使用叉乘来计算这个面的法向量
 		target.subVectors( c, b );
 		_v0.subVectors( a, b );
 		target.cross( _v0 );
 
 		const targetLengthSq = target.lengthSq();
 		if ( targetLengthSq > 0 ) {
-
+            // 归一化处理
 			return target.multiplyScalar( 1 / Math.sqrt( targetLengthSq ) );
 
 		}
@@ -47,19 +73,34 @@ class Triangle {
 
 	}
 
-	// static/instance method to calculate barycentric coordinates
-	// based on: http://www.blackpawn.com/texts/pointinpoly/default.html
+    /**
+     * 用来计算重心坐标的静态/实例方法
+     * @param {*} point 指定的点位
+     * @param {*} a 平面三角形的顶点1
+     * @param {*} b 平面三角形的顶点2
+     * @param {*} c 平面三角形的顶点3
+     * @param {*} target 结果将会被拷贝到这个Vector3中
+     * @returns 
+     * 
+     * 函数算法参考：http://www.blackpawn.com/texts/pointinpoly/default.html
+     * 注意这个函数并不是用来计算一个三角形的重心，而是通过类似计算重心坐标的方式来表示平面上任意一点的位置
+     * 这样可以简单判断一个点是否在三角形中
+     */
 	static getBarycoord( point, a, b, c, target ) {
 
-		_v0.subVectors( c, a );
-		_v1.subVectors( b, a );
-		_v2.subVectors( point, a );
+        const ca = new Vector3();
+        const ba = new Vector3();
+        const pa = new Vector3();
 
-		const dot00 = _v0.dot( _v0 );
-		const dot01 = _v0.dot( _v1 );
-		const dot02 = _v0.dot( _v2 );
-		const dot11 = _v1.dot( _v1 );
-		const dot12 = _v1.dot( _v2 );
+		ca.subVectors( c, a );
+		ba.subVectors( b, a );
+		pa.subVectors( point, a );
+
+		const dot00 = ca.dot( ca );
+		const dot01 = ca.dot( ba );
+		const dot02 = ca.dot( pa );
+		const dot11 = ba.dot( ba );
+		const dot12 = ba.dot( pa );
 
 		const denom = ( dot00 * dot11 - dot01 * dot01 );
 
@@ -70,11 +111,12 @@ class Triangle {
 
 		}
 
-		// collinear or singular triangle
+        // 三个点共线 or 奇异三角形
+        // TODO： 为什么奇异三角形会返回0?
 		if ( denom === 0 ) {
 
-			// arbitrary location outside of triangle?
-			// not sure if this is the best idea, maybe should be returning undefined
+			// 任意点都在三角形外
+			// 不确定这是不是最好的返回值，或许应该返回undefined
 			return target.set( - 2, - 1, - 1 );
 
 		}
@@ -83,11 +125,19 @@ class Triangle {
 		const u = ( dot11 * dot02 - dot01 * dot12 ) * invDenom;
 		const v = ( dot00 * dot12 - dot01 * dot02 ) * invDenom;
 
-		// barycentric coordinates must always sum to 1
+		// 重心坐标的x,y,z必须加起来等于1
 		return target.set( 1 - u - v, v, u );
 
 	}
 
+    /**
+     * 计算三角形中是否包含某个点
+     * @param {*} point 指定的点位
+     * @param {*} a 平面三角形的顶点1
+     * @param {*} b 平面三角形的顶点2
+     * @param {*} c 平面三角形的顶点3
+     * @returns 
+     */
 	static containsPoint( point, a, b, c ) {
 
 		this.getBarycoord( point, a, b, c, _v3 );
@@ -96,6 +146,18 @@ class Triangle {
 
 	}
 
+    /**
+     * uv插值计算，通过三个点的uv，插值计算出任意点的uv。
+     * @param {*} point 要进行uv插值的点的位置
+     * @param {*} p1 顶点1的位置
+     * @param {*} p2 顶点2的位置
+     * @param {*} p3 顶点3的位置
+     * @param {*} uv1 顶点1的uv
+     * @param {*} uv2 顶点2的uv
+     * @param {*} uv3 顶点3的uv
+     * @param {*} target 结果将会被拷贝到这个Vector2中
+     * @returns 
+     */
 	static getUV( point, p1, p2, p3, uv1, uv2, uv3, target ) {
 
 		this.getBarycoord( point, p1, p2, p3, _v3 );
@@ -109,6 +171,14 @@ class Triangle {
 
 	}
 
+    /**
+     * 判断一个给定向量是否朝向给定三点组成的平面三角形法向量
+     * @param {*} a 平面三角形的顶点1
+     * @param {*} b 平面三角形的顶点2
+     * @param {*} c 平面三角形的顶点3
+     * @param {*} direction 
+     * @returns 
+     */
 	static isFrontFacing( a, b, c, direction ) {
 
 		_v0.subVectors( c, b );
@@ -119,6 +189,13 @@ class Triangle {
 
 	}
 
+    /**
+     * 设置平米三角形的三个点
+     * @param {*} a 
+     * @param {*} b 
+     * @param {*} c 
+     * @returns 
+     */
 	set( a, b, c ) {
 
 		this.a.copy( a );
@@ -129,6 +206,14 @@ class Triangle {
 
 	}
 
+    /**
+     * 设置三角形的顶点坐标为数组中的坐标
+     * @param {*} points 顶点数组
+     * @param {*} i0 第一个点的索引
+     * @param {*} i1 第二个点的索引
+     * @param {*} i2 第三个点的索引
+     * @returns 
+     */
 	setFromPointsAndIndices( points, i0, i1, i2 ) {
 
 		this.a.copy( points[ i0 ] );
@@ -139,12 +224,21 @@ class Triangle {
 
 	}
 
+    /**
+     * 返回一个该平面三角形的拷贝
+     * @returns 
+     */
 	clone() {
 
 		return new this.constructor().copy( this );
 
 	}
 
+    /**
+     * 将自己设置为一个指定三角形的复制
+     * @param {*} triangle 
+     * @returns 
+     */
 	copy( triangle ) {
 
 		this.a.copy( triangle.a );
@@ -155,6 +249,10 @@ class Triangle {
 
 	}
 
+    /**
+     * 计算平面三角形的面积
+     * @returns 
+     */
 	getArea() {
 
 		_v0.subVectors( this.c, this.b );
@@ -164,6 +262,9 @@ class Triangle {
 
 	}
 
+    /**
+     * 计算三角形的中点。
+     */
 	getMidpoint( target ) {
 
 		if ( target === undefined ) {
@@ -177,12 +278,22 @@ class Triangle {
 
 	}
 
+    /**
+     * 获取三角面的normal
+     * @param {*} target 
+     * @returns 
+     */
 	getNormal( target ) {
 
 		return Triangle.getNormal( this.a, this.b, this.c, target );
 
 	}
 
+    /**
+     * 获取平面三角形坐在的平面
+     * @param {*} target 
+     * @returns 
+     */
 	getPlane( target ) {
 
 		if ( target === undefined ) {
@@ -192,40 +303,77 @@ class Triangle {
 
 		}
 
+        // 通过空间中三个不共线的三个点确定一个平面
 		return target.setFromCoplanarPoints( this.a, this.b, this.c );
 
 	}
 
+    /**
+     * 计算指定点的重心坐标
+     * @param {*} point 指定的点
+     * @param {*} target 结果将会被拷贝到这个Vector3中
+     * @returns 
+     */
 	getBarycoord( point, target ) {
 
 		return Triangle.getBarycoord( point, this.a, this.b, this.c, target );
 
 	}
 
+    /**
+     * uv插值计算，通过本平面三角形三个顶点的uv，插值计算出任意点的uv。
+     * @param {*} point 要进行uv插值的点的位置
+     * @param {*} uv1 顶点1的uv
+     * @param {*} uv2 顶点2的uv
+     * @param {*} uv3 顶点3的uv
+     * @param {*} target 结果将会被拷贝到这个Vector2中
+     * @returns 
+     */
 	getUV( point, uv1, uv2, uv3, target ) {
 
 		return Triangle.getUV( point, this.a, this.b, this.c, uv1, uv2, uv3, target );
 
 	}
 
+    /**
+     * 判断指定点是否在本平面三角形中
+     * @param {*} point 
+     * @returns 
+     */
 	containsPoint( point ) {
 
 		return Triangle.containsPoint( point, this.a, this.b, this.c );
 
 	}
 
+    /**
+     * 判断一个给定向量是否朝向平面三角形法向量
+     * @param {*} direction 
+     * @returns 
+     */
 	isFrontFacing( direction ) {
 
 		return Triangle.isFrontFacing( this.a, this.b, this.c, direction );
 
 	}
 
+    /**
+     * 判定三角形与传入的box是否相交
+     * @param {*} box 
+     * @returns 
+     */
 	intersectsBox( box ) {
 
 		return box.intersectsTriangle( this );
 
 	}
 
+    /**
+     * 返回三角形上最靠近所给定的point的点
+     * @param {*} p 指定的点
+     * @param {*} target 结果将会被拷贝到这个Vector3中
+     * @returns 
+     */
 	closestPointToPoint( p, target ) {
 
 		if ( target === undefined ) {
@@ -238,11 +386,10 @@ class Triangle {
 		const a = this.a, b = this.b, c = this.c;
 		let v, w;
 
-		// algorithm thanks to Real-Time Collision Detection by Christer Ericson,
-		// published by Morgan Kaufmann Publishers, (c) 2005 Elsevier Inc.,
-		// under the accompanying license; see chapter 5.1.5 for detailed explanation.
-		// basically, we're distinguishing which of the voronoi regions of the triangle
-		// the point lies in with the minimum amount of redundant computation.
+        // 算法来自christer Ericsion所著的《Real-Time Collision Detection》
+        // Morgan Kaufmann 出版社, (c) 2005 Elsevier Inc.,
+        // 版权许可。请查看5.1.5章节来了解详情。
+        // 基本上来说，我们希望通过最少的冗余计算来得到指定点p位于哪个voronoi区域
 
 		_vab.subVectors( b, a );
 		_vac.subVectors( c, a );
@@ -252,6 +399,7 @@ class Triangle {
 		if ( d1 <= 0 && d2 <= 0 ) {
 
 			// vertex region of A; barycentric coords (1, 0, 0)
+            // 顶点A的区域，重心坐标（1,0,0）
 			return target.copy( a );
 
 		}
@@ -260,8 +408,8 @@ class Triangle {
 		const d3 = _vab.dot( _vbp );
 		const d4 = _vac.dot( _vbp );
 		if ( d3 >= 0 && d4 <= d3 ) {
-
 			// vertex region of B; barycentric coords (0, 1, 0)
+            // 顶点B的区域，重心坐标（0,1,0）
 			return target.copy( b );
 
 		}
@@ -271,6 +419,7 @@ class Triangle {
 
 			v = d1 / ( d1 - d3 );
 			// edge region of AB; barycentric coords (1-v, v, 0)
+            // AB边的区域; 重心坐标 (1-v, v, 0)
 			return target.copy( a ).addScaledVector( _vab, v );
 
 		}
@@ -281,6 +430,7 @@ class Triangle {
 		if ( d6 >= 0 && d5 <= d6 ) {
 
 			// vertex region of C; barycentric coords (0, 0, 1)
+            // 顶点C的区域，重心坐标(0, 0, 1)
 			return target.copy( c );
 
 		}
@@ -290,6 +440,7 @@ class Triangle {
 
 			w = d2 / ( d2 - d6 );
 			// edge region of AC; barycentric coords (1-w, 0, w)
+            // AC边的区域; 重心坐标 (1-w, 0, w)
 			return target.copy( a ).addScaledVector( _vac, w );
 
 		}
@@ -300,11 +451,13 @@ class Triangle {
 			_vbc.subVectors( c, b );
 			w = ( d4 - d3 ) / ( ( d4 - d3 ) + ( d5 - d6 ) );
 			// edge region of BC; barycentric coords (0, 1-w, w)
+            // BC边的区域; 重心坐标 (0, 1-w, w)
 			return target.copy( b ).addScaledVector( _vbc, w ); // edge region of BC
 
 		}
 
 		// face region
+        // 平面三角形面上的区域
 		const denom = 1 / ( va + vb + vc );
 		// u = va * denom
 		v = vb * denom;
@@ -314,6 +467,11 @@ class Triangle {
 
 	}
 
+    /**
+     * 判断本平面三角形是否和传入的平面三角形相同
+     * @param {*} triangle 
+     * @returns 
+     */
 	equals( triangle ) {
 
 		return triangle.a.equals( this.a ) && triangle.b.equals( this.b ) && triangle.c.equals( this.c );
